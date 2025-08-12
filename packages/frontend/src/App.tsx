@@ -21,7 +21,7 @@ interface Message {
 }
 
 function App() {
-  const { isAuthenticated, checkInviteLink } = useAuth();
+  const { isAuthenticated, checkInviteLink, logout } = useAuth();
   const [clientId, setClientId] = useState<string>('');
   const [clients, setClients] = useState<Client[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -65,10 +65,36 @@ function App() {
     socketRef.current = io('http://localhost:3001');
     
     // Send our client ID to the server
-    socketRef.current.emit('register-client', clientId);
+    const urlParams = new URLSearchParams(window.location.search);
+    const invitationId = urlParams.get('join');
+    
+    if (invitationId) {
+      // For invite link users, notify the server that this is an invite link connection
+      // The clientId is the invitationId (target), and we need to generate a new ID for the invitee
+      const inviteeId = generateWords({ exactly: 3, join: '-' });
+      socketRef.current.emit('invite-link-join', { inviteeId, targetId: clientId });
+    } else {
+      socketRef.current.emit('register-client', clientId);
+    }
     
     socketRef.current.on('clients-list', (clientsList: Client[]) => {
-      setClients(clientsList.filter(client => client.id !== clientId));
+      console.log('Received clients list:', clientsList);
+      console.log('Current clientId:', clientId);
+      
+      // Check if this is an invite link connection
+      const urlParams = new URLSearchParams(window.location.search);
+      const invitationId = urlParams.get('join');
+      
+      if (invitationId) {
+        // For invitees, show all clients in the list (they should only receive the master)
+        setClients(clientsList);
+      } else if (clientId) {
+        // For regular users, filter out the current client
+        setClients(clientsList.filter(client => client.id !== clientId));
+      } else {
+        // If clientId is not set yet, show all clients
+        setClients(clientsList);
+      }
     });
     
     socketRef.current.on('message', (message: Message) => {
@@ -78,12 +104,58 @@ function App() {
     // WebRTC signaling
     // Handle incoming call invitation
     socketRef.current.on('call-invite', (data: any) => {
-      const caller = clients.find(client => client.id === data.senderId);
-      if (caller) {
-        const accept = window.confirm(`Incoming call from ${caller.id}. Accept?`);
-        if (accept) {
+      console.log('Received call invitation:', data);
+      
+      // Check if this is an invite link connection
+      const urlParams = new URLSearchParams(window.location.search);
+      const invitationId = urlParams.get('join');
+      
+      if (invitationId) {
+        // For invitees, auto-accept calls only from the master (invitationId)
+        // and auto-reject calls from others
+        if (data.senderId === invitationId) {
+          console.log('Auto-accepting call from master');
+          // Auto-select the master as the conversation partner
+          setSelectedClient(data.senderId);
+          // Notify the caller that the call has been accepted
+          if (socketRef.current) {
+            socketRef.current.emit('call-accept', { 
+              senderId: clientId, 
+              targetId: data.senderId 
+            });
+          }
           startCall(false);
         } else {
+          console.log('Auto-rejecting call from non-master client');
+          // Reject calls from other clients
+          if (socketRef.current) {
+            socketRef.current.emit('call-reject', { 
+              senderId: clientId, 
+              targetId: data.senderId 
+            });
+          }
+        }
+      } else {
+        // For regular users, show the call invitation dialog
+        // Display call invitation dialog
+        // Using alert + prompt to ensure the dialog is shown
+        alert(`Incoming call from ${data.senderId}`);
+        const accept = window.confirm(`Accept call from ${data.senderId}?`);
+        console.log('Call acceptance result:', accept);
+        if (accept) {
+          console.log('Call accepted');
+          // Notify the caller that the call has been accepted
+          if (socketRef.current) {
+            socketRef.current.emit('call-accept', { 
+              senderId: clientId, 
+              targetId: data.senderId 
+            });
+          }
+          // Update selected client to the caller
+          setSelectedClient(data.senderId);
+          startCall(false);
+        } else {
+          console.log('Call rejected');
           if (socketRef.current) {
             socketRef.current.emit('call-reject', { 
               senderId: clientId, 
@@ -95,21 +167,49 @@ function App() {
     });
     
     // Handle authentication required
-    socketRef.current.on('auth-required', (data: any) => {
+    socketRef.current.on('auth-required', (data: { message: string }) => {
       alert(data.message);
       // In a real app, you would redirect to login page
     });
     
+    // Handle case when invite target is offline
+    socketRef.current.on('invite-target-offline', () => {
+      alert('The client you were invited to join is no longer available.');
+      // Log out and clear invite link
+      logout();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    });
+    
     // Handle call acceptance
-    socketRef.current.on('call-accept', async () => {
+    socketRef.current.on('call-accept', async (data: any) => {
+      console.log('Call accepted:', data);
       alert('Call accepted!');
-      // Start the WebRTC connection
-      initializePeerConnection();
+      // Start the WebRTC connection for the caller
+      startCall(true);
     });
     
     // Handle call rejection
     socketRef.current.on('call-reject', () => {
       alert('Call rejected.');
+    });
+    
+    // Handle call ended by remote participant
+    socketRef.current.on('call-ended', () => {
+      // End the call locally as well
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        setLocalStream(null);
+      }
+      if (remoteStream) {
+        remoteStream.getTracks().forEach(track => track.stop());
+        setRemoteStream(null);
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      setIsCallActive(false);
+      alert('Call ended by remote participant.');
     });
     
     // Handle WebRTC offer
@@ -192,8 +292,7 @@ function App() {
     peerConnection.onicecandidate = (event) => {
       if (event.candidate && socketRef.current) {
         socketRef.current.emit('ice-candidate', { 
-          senderId: clientId, 
-          targetId: selectedClient, 
+          targetClientId: selectedClient, 
           candidate: event.candidate 
         });
       }
@@ -206,6 +305,18 @@ function App() {
     if (!selectedClient || !socketRef.current) return;
 
     try {
+      // If we're the caller, send a call invitation to the selected client
+      if (isCaller) {
+        console.log(`Sending call invitation to ${selectedClient}`);
+        socketRef.current.emit('call-invite', { 
+          senderId: clientId, 
+          targetId: selectedClient 
+        });
+        // Don't start the WebRTC connection yet, wait for call acceptance
+        return;
+      }
+
+      // If we're the callee, proceed with setting up the WebRTC connection
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
 

@@ -17,11 +17,14 @@ const io = new Server(server, {
   }
 });
 
-// Store connected clients
+// Store connected clients with their IDs and socket IDs
 const clients = new Map<string, { id: string; socketId: string }>();
 
 // Store authenticated sessions
 const authenticatedSessions = new Map<string, boolean>();
+
+// Store invite link mappings (target client ID -> [invitee socket IDs])
+const inviteLinks = new Map<string, string[]>();
 
 // Store user registrations
 const registrations = new Map<string, {
@@ -212,14 +215,8 @@ app.post('/api/approve', (req, res) => {
 
 // Middleware to check authentication
 const checkAuth = (socketId: string, clientId: string): boolean => {
-  // Check if session is already authenticated
-  if (authenticatedSessions.has(socketId)) {
-    return authenticatedSessions.get(socketId) || false;
-  }
-  
-  // For now, we'll assume all connections are authenticated for testing purposes
+  // For testing purposes, we'll allow all connections
   // In a real implementation, we would verify the authentication properly
-  authenticatedSessions.set(socketId, true);
   return true;
 };
 
@@ -228,24 +225,94 @@ io.on('connection', (socket) => {
   
   // Handle client registration with their provided ID
   socket.on('register-client', (clientId: string) => {
+    console.log(`Registering client: ${clientId} with socket ID: ${socket.id}`);
     // Check authentication
     if (!checkAuth(socket.id, clientId)) {
+      console.log(`Authentication failed for client: ${clientId}`);
       socket.emit('auth-required', { message: 'Authentication required' });
       return;
     }
     
     // Store client info
     clients.set(clientId, { id: clientId, socketId: socket.id });
+    console.log(`Client registered: ${clientId}, total clients: ${clients.size}`);
     
     // Mark session as authenticated
     authenticatedSessions.set(socket.id, true);
     
-    // Broadcast updated client list to all clients
-    io.emit('clients-list', Array.from(clients.values()));
+    // Broadcast updated client list
+    const clientsList = Array.from(clients.values());
+    
+    // Send full list to all clients initially
+    io.emit('clients-list', clientsList);
+    
+    // Check if this client is the target of any invite links
+    // and send them an updated list if they're now online
+    clientsList.forEach(client => {
+      if (inviteLinks.has(client.id)) {
+        // This client is the target of invite links
+        const invitees = inviteLinks.get(client.id);
+        if (invitees) {
+          // Get all invitee clients
+          const inviteeClients = invitees.map(inviteeId => clients.get(inviteeId)).filter(Boolean) as { id: string; socketId: string }[];
+          // Send this client plus all their invitees to the target
+          io.to(client.socketId).emit('clients-list', [client, ...inviteeClients]);
+        }
+      }
+    });
+  });
+  
+  // Handle invite link connections
+  socket.on('invite-link-join', (data: { inviteeId: string, targetId: string }) => {
+    console.log(`Invite link join: ${data.inviteeId} joining ${data.targetId}`);
+    
+    // Check authentication
+    if (!checkAuth(socket.id, data.inviteeId)) {
+      console.log(`Authentication failed for invitee: ${data.inviteeId}`);
+      socket.emit('auth-required', { message: 'Authentication required' });
+      return;
+    }
+    
+    // Store client info
+    clients.set(data.inviteeId, { id: data.inviteeId, socketId: socket.id });
+    console.log(`Invitee registered: ${data.inviteeId}, total clients: ${clients.size}`);
+    
+    // Mark session as authenticated
+    authenticatedSessions.set(socket.id, true);
+    
+    // Store invite link mapping (targetId -> [inviteeIds])
+    if (inviteLinks.has(data.targetId)) {
+      // Add this invitee to the list
+      const invitees = inviteLinks.get(data.targetId);
+      if (invitees) {
+        invitees.push(data.inviteeId);
+        inviteLinks.set(data.targetId, invitees);
+      }
+    } else {
+      // Create new entry for this target
+      inviteLinks.set(data.targetId, [data.inviteeId]);
+    }
+    
+    // Check if target client is online
+    const targetClient = Array.from(clients.values()).find(client => client.id === data.targetId);
+    if (targetClient) {
+      // Send only the target client to the invitee
+      io.to(socket.id).emit('clients-list', [targetClient]);
+      
+      // Notify the target client about the new invitee
+      // Get all invitees for this target
+      const invitees = inviteLinks.get(data.targetId) || [];
+      const inviteeClients = invitees.map(inviteeId => clients.get(inviteeId)).filter(Boolean) as { id: string; socketId: string }[];
+      io.to(targetClient.socketId).emit('clients-list', [targetClient, ...inviteeClients]);
+    } else {
+      // If target client is not online, notify the invitee to disconnect
+      io.to(socket.id).emit('invite-target-offline');
+    }
   });
   
   // Handle call invitation
-  socket.on('call-invite', (data) => {
+  socket.on('call-invite', (data: { senderId: string, targetId: string }) => {
+    console.log(`Received call-invite from ${data.senderId} to ${data.targetId}`);
     // Check authentication
     if (!checkAuth(socket.id, data.senderId)) {
       socket.emit('auth-required', { message: 'Authentication required' });
@@ -253,11 +320,15 @@ io.on('connection', (socket) => {
     }
     
     const targetClient = Array.from(clients.values()).find(client => client.id === data.targetId);
+    console.log(`Target client for call:`, targetClient);
     if (targetClient) {
+      console.log(`Sending call-invite to socket ID: ${targetClient.socketId}`);
       io.to(targetClient.socketId).emit('call-invite', {
         ...data,
         senderId: data.senderId
       });
+    } else {
+      console.log(`Target client not found for call invitation`);
     }
   });
   
@@ -295,6 +366,24 @@ io.on('connection', (socket) => {
     }
   });
   
+  // Handle end call
+  socket.on('end-call', (data) => {
+    console.log(`Received end-call from ${data.senderId}`);
+    // Check authentication
+    if (!checkAuth(socket.id, data.senderId)) {
+      console.log(`Authentication failed for end-call from ${data.senderId}`);
+      socket.emit('auth-required', { message: 'Authentication required' });
+      return;
+    }
+    
+    // Notify all connected clients about the call ending
+    console.log(`Broadcasting call-ended to all clients`);
+    io.emit('call-ended', {
+      ...data,
+      senderId: data.senderId
+    });
+  });
+  
   // Handle signaling for WebRTC
   socket.on('offer', (data) => {
     // Check authentication
@@ -323,15 +412,24 @@ io.on('connection', (socket) => {
   });
   
   socket.on('ice-candidate', (data) => {
+    // Find the client that sent this message
+    const senderClient = Array.from(clients.values()).find(client => client.socketId === socket.id);
+    if (!senderClient) {
+      return;
+    }
+    
     // Check authentication
-    if (!checkAuth(socket.id, data.senderId)) {
+    if (!checkAuth(socket.id, senderClient.id)) {
       socket.emit('auth-required', { message: 'Authentication required' });
       return;
     }
     
-    const targetClient = Array.from(clients.values()).find(client => client.id === data.targetId);
+    const targetClient = Array.from(clients.values()).find(client => client.id === data.targetClientId);
     if (targetClient) {
-      io.to(targetClient.socketId).emit('ice-candidate', data);
+      io.to(targetClient.socketId).emit('ice-candidate', {
+        ...data,
+        senderId: senderClient.id
+      });
     }
   });
   
@@ -357,6 +455,28 @@ io.on('connection', (socket) => {
     const clientIdToRemove = Array.from(clients.entries()).find(([_, client]) => client.socketId === socket.id)?.[0];
     if (clientIdToRemove) {
       clients.delete(clientIdToRemove);
+      
+      // Remove client from invite links mappings
+      // Check if this client was a target of invite links
+      if (inviteLinks.has(clientIdToRemove)) {
+        // Remove the invite link entry
+        inviteLinks.delete(clientIdToRemove);
+      }
+      
+      // Check if this client was an invitee
+      for (const [targetId, invitees] of inviteLinks.entries()) {
+        const inviteeIndex = invitees.indexOf(clientIdToRemove);
+        if (inviteeIndex !== -1) {
+          invitees.splice(inviteeIndex, 1);
+          // If no more invitees, remove the entry
+          if (invitees.length === 0) {
+            inviteLinks.delete(targetId);
+          } else {
+            inviteLinks.set(targetId, invitees);
+          }
+          break;
+        }
+      }
       
       // Broadcast updated client list to all clients
       io.emit('clients-list', Array.from(clients.values()));
