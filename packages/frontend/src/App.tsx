@@ -75,6 +75,17 @@ function App() {
       }
     });
     
+    // Handle when messages are marked as read by another client
+    socketRef.current.on('messages-marked-as-read', (data: { readerId: string }) => {
+      setUnreadMessages(prev => {
+        const newUnread = { ...prev };
+        if (newUnread[data.readerId]) {
+          delete newUnread[data.readerId];
+        }
+        return newUnread;
+      });
+    });
+    
     // WebRTC signaling
     socketRef.current.on('offer', async (data: any) => {
       if (!peerConnectionRef.current) {
@@ -241,6 +252,14 @@ function App() {
                         delete newUnread[client.id];
                         return newUnread;
                       });
+                      
+                      // Notify the sender that their messages have been read
+                      if (socketRef.current) {
+                        socketRef.current.emit('mark-messages-as-read', {
+                          senderId: client.id,
+                          targetId: clientId
+                        });
+                      }
                     }
                     setSelectedClient(client.id);
                   }}
