@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import { generate as generateWords } from 'random-words';
 import './App.css';
+import ThemeToggle from './components/ThemeToggle';
 
 interface Client {
   id: string;
@@ -191,7 +192,10 @@ function App() {
   return (
     <div className="app">
       <header>
-        <h1>Incommunicado Messaging App</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1>Incommunicado Messaging App</h1>
+          <ThemeToggle />
+        </div>
         <div className="client-id-container">
           <div className="client-id">
             Your ID: <strong>{clientId}</strong>

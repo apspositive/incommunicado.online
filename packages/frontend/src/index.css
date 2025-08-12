@@ -4,8 +4,23 @@
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #f5f5f5;
+  --background-color: #f5f5f5;
+  --text-color: rgba(0, 0, 0, 0.87);
+  --header-border-color: #e0e0e0;
+  --section-background: #ffffff;
+  --section-shadow: rgba(0, 0, 0, 0.1);
+  --client-item-background: #f8f8f8;
+  --client-item-hover: #e8e8e8;
+  --message-sent-background: #20c997;
+  --message-sent-text: #ffffff;
+  --message-received-background: #f0f0f0;
+  --message-received-text: #333333;
+  --input-border: #e0e0e0;
+  --disabled-button: #cccccc;
+  --video-background: #000000;
+
+  color: var(--text-color);
+  background-color: var(--background-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -34,7 +49,7 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #007bff;
+  background-color: #20c997;
   color: white;
   cursor: pointer;
   transition: all 0.2s;
@@ -54,9 +69,26 @@ input, textarea {
   font-size: 1em;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #242424;
-  }
+/* Dark theme class */
+.dark {
+  --background-color: #242424;
+  --text-color: rgba(255, 255, 255, 0.87);
+  --header-border-color: #444444;
+  --section-background: #333333;
+  --section-shadow: rgba(0, 0, 0, 0.3);
+  --client-item-background: #444444;
+  --client-item-hover: #555555;
+  --message-sent-background: #007bff;
+  --message-sent-text: #ffffff;
+  --message-received-background: #444444;
+  --message-received-text: rgba(255, 255, 255, 0.87);
+  --input-border: #555555;
+  --disabled-button: #666666;
+  --video-background: #000000;
+}
+
+/* Apply CSS variables - removed redundant :root declaration */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
