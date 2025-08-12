@@ -23,6 +23,8 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState<string>('');
   const [selectedClient, setSelectedClient] = useState<string>('');
+  const [isCallActive, setIsCallActive] = useState<boolean>(false);
+  const [unreadMessages, setUnreadMessages] = useState<Record<string, number>>({});
   
   const socketRef = useRef<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -63,6 +65,14 @@ function App() {
     
     socketRef.current.on('message', (message: Message) => {
       setMessages(prev => [...prev, message]);
+      
+      // Track unread messages for each client
+      if (message.senderId !== clientId && message.senderId !== selectedClient) {
+        setUnreadMessages(prev => ({
+          ...prev,
+          [message.senderId]: (prev[message.senderId] || 0) + 1
+        }));
+      }
     });
     
     // WebRTC signaling
@@ -175,6 +185,7 @@ function App() {
     if (!selectedClient) return;
     
     initializePeerConnection();
+    setIsCallActive(true);
     
     try {
       const offer = await peerConnectionRef.current!.createOffer();
@@ -197,16 +208,17 @@ function App() {
           <ThemeToggle />
         </div>
         <div className="client-id-container">
-          <div className="client-id">
+          <div 
+            className="client-id"
+            onClick={() => {
+              const link = `${window.location.origin}?join=${clientId}`;
+              navigator.clipboard.writeText(link);
+              alert('Invite link copied to clipboard!');
+            }}
+            style={{ cursor: 'pointer' }}
+          >
             Your ID: <strong>{clientId}</strong>
           </div>
-          <button className="copy-link-btn" onClick={() => {
-            const link = `${window.location.origin}?join=${clientId}`;
-            navigator.clipboard.writeText(link);
-            alert('Invite link copied to clipboard!');
-          }}>
-            Copy Invite Link
-          </button>
         </div>
       </header>
       
@@ -221,86 +233,112 @@ function App() {
                 <li 
                   key={client.id}
                   className={selectedClient === client.id ? 'selected' : ''}
-                  onClick={() => setSelectedClient(client.id)}
+                  onClick={() => {
+                    // Reset unread count when selecting a client
+                    if (unreadMessages[client.id]) {
+                      setUnreadMessages(prev => {
+                        const newUnread = { ...prev };
+                        delete newUnread[client.id];
+                        return newUnread;
+                      });
+                    }
+                    setSelectedClient(client.id);
+                  }}
                 >
                   {client.id}
+                  {unreadMessages[client.id] > 0 && (
+                    <span className="unread-count">{unreadMessages[client.id]}</span>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </div>
         
-        <div className="messaging-section">
-          <h2>Messages</h2>
-          <div className="messages-container">
-            {messages
-              .filter(msg => 
-                (msg.senderId === clientId && msg.targetId === selectedClient) ||
-                (msg.senderId === selectedClient && msg.targetId === clientId)
-              )
-              .map(message => (
-                <div 
-                  key={message.id} 
-                  className={`message ${message.senderId === clientId ? 'sent' : 'received'}`}
-                >
-                  <div className="message-content">{message.content}</div>
-                  <div className="message-time">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-          
-          <div className="message-input">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="Type a message..."
-              disabled={!selectedClient}
-            />
-            <button onClick={sendMessage} disabled={!selectedClient}>Send</button>
-          </div>
-        </div>
-        
-        <div className="call-section">
-          <h2>Voice/Video Call</h2>
-          <div className="video-container">
-            <div className="video-wrapper">
-              <video ref={localVideoRef} autoPlay muted playsInline />
-              <div className="video-label">You</div>
+        {isCallActive ? (
+          // Show call section when call is active
+          <div className="call-section">
+            <h2>Voice/Video Call</h2>
+            <div className="video-container">
+              <div className="video-wrapper">
+                <video ref={localVideoRef} autoPlay muted playsInline />
+                <div className="video-label">You</div>
+              </div>
+              <div className="video-wrapper">
+                <video ref={remoteVideoRef} autoPlay playsInline />
+                <div className="video-label">Remote</div>
+              </div>
             </div>
-            <div className="video-wrapper">
-              <video ref={remoteVideoRef} autoPlay playsInline />
-              <div className="video-label">Remote</div>
+            <div className="call-controls">
+              <button 
+                onClick={() => {
+                  setIsCallActive(false);
+                  if (peerConnectionRef.current) {
+                    peerConnectionRef.current.close();
+                    peerConnectionRef.current = null;
+                  }
+                  if (localVideoRef.current && localVideoRef.current.srcObject) {
+                    (localVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+                    localVideoRef.current.srcObject = null;
+                  }
+                  if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
+                    (remoteVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+                    remoteVideoRef.current.srcObject = null;
+                  }
+                }}
+              >
+                End Call
+              </button>
             </div>
           </div>
-          <div className="call-controls">
-            <button onClick={startCall} disabled={!selectedClient}>
-              Start Call
-            </button>
-            <button 
-              onClick={() => {
-                if (peerConnectionRef.current) {
-                  peerConnectionRef.current.close();
-                  peerConnectionRef.current = null;
+        ) : (
+          // Show messaging section when no call is active
+          <>
+            <div className="messaging-section">
+              <h2>Messages</h2>
+              <div className="messages-container">
+                {messages
+                  .filter(msg => 
+                    (msg.senderId === clientId && msg.targetId === selectedClient) ||
+                    (msg.senderId === selectedClient && msg.targetId === clientId)
+                  )
+                  .map(message => (
+                    <div 
+                      key={message.id} 
+                      className={`message ${message.senderId === clientId ? 'sent' : 'received'}`}
+                    >
+                      <div className="message-content">{message.content}</div>
+                      <div className="message-time">
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  ))
                 }
-                if (localVideoRef.current && localVideoRef.current.srcObject) {
-                  (localVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-                  localVideoRef.current.srcObject = null;
-                }
-                if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-                  (remoteVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-                  remoteVideoRef.current.srcObject = null;
-                }
-              }}
-            >
-              End Call
-            </button>
-          </div>
-        </div>
+              </div>
+              
+              <div className="message-input">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Type a message..."
+                  disabled={!selectedClient}
+                />
+                <button onClick={sendMessage} disabled={!selectedClient}>Send</button>
+              </div>
+            </div>
+            
+            <div className="call-section">  
+              <h2>Voice/Video Call</h2>
+              <div className="call-controls">
+                <button onClick={startCall} disabled={!selectedClient} className='start-call-btn'>
+                  Start Call
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );

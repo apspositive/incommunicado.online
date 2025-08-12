@@ -55,6 +55,10 @@ button {
   transition: all 0.2s;
 }
 
+.start-call-btn {
+  background-color: #20c997 !important;
+}
+
 button:hover {
   opacity: 0.9;
 }
@@ -78,7 +82,7 @@ input, textarea {
   --section-shadow: rgba(0, 0, 0, 0.3);
   --client-item-background: #444444;
   --client-item-hover: #555555;
-  --message-sent-background: #007bff;
+  --message-sent-background: #0a8e4e8f;
   --message-sent-text: #ffffff;
   --message-received-background: #444444;
   --message-received-text: rgba(255, 255, 255, 0.87);
