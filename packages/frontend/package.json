@@ -1,0 +1,28 @@
+{
+  "name": "@incommunicado/frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "random-words": "^2.0.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "simple-peer": "^9.11.1",
+    "socket.io-client": "^4.8.1",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@types/simple-peer": "^9.11.8",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^7.1.2"
+  }
+}

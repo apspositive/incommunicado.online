@@ -1,0 +1,18 @@
+{
+  "name": "incommunicado.online",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm run dev -w packages/frontend",
+    "dev:backend": "npm run dev -w packages/backend",
+    "build": "npm run build -w packages/frontend && npm run build -w packages/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
