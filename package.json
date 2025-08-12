@@ -13,6 +13,10 @@
     "build": "npm run build -w packages/frontend && npm run build -w packages/backend"
   },
   "devDependencies": {
+    "@types/express-session": "^1.18.2",
+    "@types/passport": "^1.0.17",
+    "@types/passport-github2": "^1.2.9",
+    "@types/passport-google-oauth20": "^2.0.16",
     "concurrently": "^8.0.0"
   }
 }

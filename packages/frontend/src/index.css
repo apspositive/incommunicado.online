@@ -3,10 +3,6 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #f5f5f5;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -34,29 +30,15 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #007bff;
-  color: white;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-button:hover {
-  opacity: 0.9;
-}
-
 button:disabled {
-  opacity: 0.6;
   cursor: not-allowed;
 }
 
 input, textarea {
   font-family: inherit;
   font-size: 1em;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #242424;
-  }
 }

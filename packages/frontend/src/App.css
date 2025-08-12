@@ -1,15 +1,67 @@
+/* CSS Variables for Light/Dark Theme */
+:root {
+  /* Light theme colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-inverse: #ffffff;
+  --border-color: #dee2e6;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --accent-primary: #007bff;
+  --accent-primary-hover: #0069d9;
+  --accent-success: #28a745;
+  --accent-success-hover: #218838;
+  --accent-danger: #dc3545;
+  --accent-danger-hover: #c82333;
+  --message-sent-bg: #007bff;
+  --message-received-bg: #f0f0f0;
+}
+
+[data-theme="dark"] {
+  /* Dark theme colors */
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2d2d2d;
+  --text-primary: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --text-inverse: #212529;
+  --border-color: #444444;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --accent-primary: #3796ff;
+  --accent-primary-hover: #5aa6ff;
+  --accent-success: #3bc55f;
+  --accent-success-hover: #5cd07d;
+  --accent-danger: #e74c3c;
+  --accent-danger-hover: #ec7063;
+  --message-sent-bg: #3796ff;
+  --message-received-bg: #2d2d2d;
+}
+
 .app {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
 }
 
 header {
   text-align: center;
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .client-id-container {
@@ -20,7 +72,8 @@ header {
 }
 
 .client-id {
-  background-color: #f0f0f0;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
   padding: 10px;
   border-radius: 5px;
   display: inline-block;
@@ -30,8 +83,8 @@ header {
 }
 
 .copy-link-btn {
-  background-color: #28a745;
-  color: white;
+  background-color: var(--accent-success);
+  color: var(--text-inverse);
   border: none;
   padding: 8px 16px;
   border-radius: 4px;
@@ -41,11 +94,40 @@ header {
 }
 
 .copy-link-btn:hover {
-  background-color: #218838;
+  background-color: var(--accent-success-hover);
 }
 
 .copy-link-btn:active {
   transform: translateY(1px);
+}
+
+.theme-toggle-container {
+  display: flex;
+  align-items: center;
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background-color: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
 }
 
 main {
@@ -58,13 +140,19 @@ main {
   main {
     grid-template-columns: 1fr;
   }
+  
+  .header-controls {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
 .clients-section, .messaging-section, .call-section {
-  background-color: #fff;
+  background-color: var(--bg-secondary);
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px var(--shadow);
   padding: 20px;
+  color: var(--text-primary);
 }
 
 .clients-section ul {
@@ -75,28 +163,31 @@ main {
 .clients-section li {
   padding: 10px;
   margin: 5px 0;
-  background-color: #f8f8f8;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .clients-section li:hover {
-  background-color: #e8e8e8;
+  background-color: var(--bg-tertiary);
+  opacity: 0.8;
 }
 
 .clients-section li.selected {
-  background-color: #007bff;
-  color: white;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .messages-container {
   height: 400px;
   overflow-y: auto;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 10px;
   margin-bottom: 15px;
+  background-color: var(--bg-primary);
 }
 
 .message {
@@ -107,14 +198,14 @@ main {
 }
 
 .message.sent {
-  background-color: #007bff;
-  color: white;
+  background-color: var(--message-sent-bg);
+  color: var(--text-inverse);
   margin-left: auto;
 }
 
 .message.received {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: var(--message-received-bg);
+  color: var(--text-primary);
   margin-right: auto;
 }
 
@@ -127,6 +218,7 @@ main {
   opacity: 0.8;
   text-align: right;
   margin-top: 5px;
+  color: var(--text-secondary);
 }
 
 .message-input {
@@ -137,22 +229,35 @@ main {
 .message-input input {
   flex: 1;
   padding: 10px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.message-input input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .message-input button {
   padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
   border: none;
   border-radius: 4px;
   cursor: pointer;
 }
 
+.message-input button:hover {
+  background-color: var(--accent-primary-hover);
+}
+
 .message-input button:disabled {
-  background-color: #cccccc;
+  background-color: var(--bg-tertiary);
   cursor: not-allowed;
+  color: var(--text-secondary);
 }
 
 .video-container {
@@ -183,6 +288,7 @@ main {
   text-align: center;
   margin-top: 5px;
   font-weight: bold;
+  color: var(--text-primary);
 }
 
 .call-controls {
@@ -193,18 +299,199 @@ main {
 
 .call-controls button {
   padding: 10px 20px;
-  background-color: #28a745;
-  color: white;
+  background-color: var(--accent-success);
+  color: var(--text-inverse);
   border: none;
   border-radius: 4px;
   cursor: pointer;
 }
 
+.call-controls button:hover {
+  background-color: var(--accent-success-hover);
+}
+
 .call-controls button:last-child {
-  background-color: #dc3545;
+  background-color: var(--accent-danger);
+}
+
+.call-controls button:last-child:hover {
+  background-color: var(--accent-danger-hover);
 }
 
 .call-controls button:disabled {
-  background-color: #cccccc;
+  background-color: var(--bg-tertiary);
   cursor: not-allowed;
+  color: var(--text-secondary);
+}
+
+/* Login Styles */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: var(--bg-secondary);
+}
+
+.login-form {
+  background-color: var(--bg-primary);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px var(--shadow);
+  width: 100%;
+  max-width: 400px;
+  color: var(--text-primary);
+}
+
+.login-form h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.login-form button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: var(--accent-primary);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.login-form button:hover {
+  background-color: var(--accent-primary-hover);
+}
+
+.login-form button:active {
+  transform: translateY(1px);
+}
+
+.error-message {
+  color: var(--accent-danger);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.success-message {
+  color: var(--accent-success);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.login-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.login-info p {
+  margin: 0;
+  text-align: center;
+}
+
+.register-link {
+  margin-top: 1rem;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.register-link button {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.register-link button:hover {
+  color: var(--accent-primary-hover);
+}
+
+/* Registration Styles */
+.registration-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: var(--bg-secondary);
+}
+
+.registration-form {
+  background-color: var(--bg-primary);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px var(--shadow);
+  width: 100%;
+  max-width: 400px;
+  color: var(--text-primary);
+}
+
+.registration-form h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+}
+
+.registration-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.registration-info p {
+  margin: 0;
+  text-align: center;
+}
+
+.info-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.success-content {
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.success-content p {
+  margin: 1rem 0;
 }
