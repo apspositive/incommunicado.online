@@ -88,6 +88,9 @@ main {
 .clients-section li.selected {
   background-color: #08585d;
   color: var(--message-sent-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .unread-count {
@@ -101,6 +104,11 @@ main {
   min-width: 18px;
   text-align: center;
   line-height: 1;
+  height: 24px;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .messages-container {
