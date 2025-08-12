@@ -217,9 +217,9 @@ const checkAuth = (socketId: string, clientId: string): boolean => {
     return authenticatedSessions.get(socketId) || false;
   }
   
-  // If not authenticated, check if client is joining via valid invite link
-  // In a real implementation, we would verify the invite link is from an online client
-  // For now, we'll assume all invite links are valid
+  // For now, we'll assume all connections are authenticated for testing purposes
+  // In a real implementation, we would verify the authentication properly
+  authenticatedSessions.set(socketId, true);
   return true;
 };
 

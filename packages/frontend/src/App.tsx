@@ -48,18 +48,21 @@ function App() {
         alert(`You've been invited to join a conversation with ID: ${invitationId}`);
         // You could automatically select this client or show a special UI
       }, 1000);
+      // For invited clients, use the invitation ID as the client ID
+      setClientId(invitationId);
+    } else {
+      // Generate a unique ID using three random English words for regular users
+      const words = generateWords({ exactly: 3, join: '-' });
+      setClientId(words);
     }
-    
-    // Generate a unique ID using three random English words
-    const words = generateWords({ exactly: 3, join: '-' });
-    setClientId(words);
   }, []);
 
-  // Initialize socket connection
+  // Initialize socket connection only after authentication
   useEffect(() => {
-    if (!clientId) return;
+    // Only establish WebSocket connection if authenticated or using valid invite link
+    if (!clientId || (!isAuthenticated && !checkInviteLink())) return;
     
-    socketRef.current = io('http://localhost:3000');
+    socketRef.current = io('http://localhost:3001');
     
     // Send our client ID to the server
     socketRef.current.emit('register-client', clientId);
@@ -161,7 +164,7 @@ function App() {
         socketRef.current.disconnect();
       }
     };
-  }, [clientId]);
+  }, [clientId, isAuthenticated, checkInviteLink]);
 
   // Setup video streams
   useEffect(() => {
@@ -282,18 +285,21 @@ function App() {
       <header>
         <h1>Incommunicado Messaging App</h1>
         <div className="header-controls">
-          <div className="client-id-container">
-            <div className="client-id">
-              Your ID: <strong>{clientId}</strong>
+          {/* Only show client ID and invite link for non-invited clients */}
+          {!checkInviteLink() && (
+            <div className="client-id-container">
+              <div className="client-id">
+                Your ID: <strong>{clientId}</strong>
+              </div>
+              <button className="copy-link-btn" onClick={() => {
+                const link = `${window.location.origin}?join=${clientId}`;
+                navigator.clipboard.writeText(link);
+                alert('Invite link copied to clipboard!');
+              }}>
+                Copy Invite Link
+              </button>
             </div>
-            <button className="copy-link-btn" onClick={() => {
-              const link = `${window.location.origin}?join=${clientId}`;
-              navigator.clipboard.writeText(link);
-              alert('Invite link copied to clipboard!');
-            }}>
-              Copy Invite Link
-            </button>
-          </div>
+          )}
           <div className="theme-toggle-container">
             <ThemeToggle />
           </div>
@@ -331,7 +337,7 @@ function App() {
                 >
                   <div className="message-content">{message.content}</div>
                   <div className="message-time">
-                    {message.timestamp.toLocaleTimeString()}
+                    {new Date(message.timestamp).toLocaleTimeString()}
                   </div>
                 </div>
               ))
