@@ -182,6 +182,7 @@ main {
   max-height: 100svh;
   flex: 1;
   background-color: #08585d;
+  background: linear-gradient(to bottom, #08580d, #010101);
 }
 
 .video-wrapper video {
@@ -222,14 +223,17 @@ main {
   position: absolute;
   top: 0;
   left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
 }
 
 .call-controls button {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  width: 15vw;
-  height: 15vw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,11 +241,46 @@ main {
   font-size: 14px;
 }
 
+.mute-btn {
+  background-color: #08585d;
+  position: absolute;
+  top: 65vw;
+  left: 12vw;
+  width: 12vw;
+  height: 12vw;
+  font-size: 12px;
+}
+
+.volume-control {
+  position: absolute;
+  top: 50vw;
+  left: 12vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 10px;
+  border-radius: 10px;
+  width: 12vw;
+}
+
+.volume-control label {
+  color: white;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.volume-control input[type="range"] {
+  width: 100%;
+}
+
 .start-call-btn {
   position: absolute;
-  top: 110px;
-  left: 75vw;
+  top: 1000px;
+  left: 45vw;
   background-color: #20c997 !important;
+  width: 90px;
+  height: 90px;
 }
 
 .end-call-btn {
@@ -249,11 +288,33 @@ main {
   position: absolute;
   top: 80vw;
   left: 12vw;
+  width: 15vw;
+  height: 15vw;
+}
+
+.mute-btn {
+  background-color: rgba(255, 255, 255, 0.3);
+  position: absolute;
+  top: 80vw;
+  left: 32vw;
+  width: 15vw;
+  height: 15vw;
 }
 
 .call-controls button:disabled {
   background-color: var(--disabled-button);
   cursor: not-allowed;
+}
+
+.volume-control {
+  width: 30vw;
+  position: absolute;
+  top: 12vw;
+  left: 12vw;
+}
+
+.volume-control input[type="range"] {
+  width: 30vw;
 }
 
 .auth-error {

@@ -26,6 +26,8 @@ function App() {
   const [isCallActive, setIsCallActive] = useState<boolean>(false);
   const [unreadMessages, setUnreadMessages] = useState<Record<string, number>>({});
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [volume, setVolume] = useState<number>(100);
   
   const socketRef = useRef<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -358,6 +360,38 @@ function App() {
                 </div>
                 <div className="call-controls">
                   <button 
+                    className="mute-btn"
+                    onClick={() => {
+                      setIsMuted(!isMuted);
+                      if (localVideoRef.current && localVideoRef.current.srcObject) {
+                        const audioTracks = (localVideoRef.current.srcObject as MediaStream).getAudioTracks();
+                        audioTracks.forEach(track => {
+                          track.enabled = !isMuted;
+                        });
+                      }
+                    }}
+                  >
+                    {isMuted ? 'Unmute' : 'Mute'}
+                  </button>
+                  
+                  <div className="volume-control">
+                    <label>Volume: {volume}%</label>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={volume}
+                      onChange={(e) => {
+                        const newVolume = parseInt(e.target.value);
+                        setVolume(newVolume);
+                        if (remoteVideoRef.current) {
+                          remoteVideoRef.current.volume = newVolume / 100;
+                        }
+                      }}
+                    />
+                  </div>
+                  
+                  <button 
                     className="end-call-btn"
                     onClick={() => {
                       setIsCallActive(false);
@@ -373,6 +407,9 @@ function App() {
                         (remoteVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
                         remoteVideoRef.current.srcObject = null;
                       }
+                      // Reset mute and volume when call ends
+                      setIsMuted(false);
+                      setVolume(100);
                     }}
                   >
                     End Call
