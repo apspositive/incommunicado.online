@@ -1,5 +1,22 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+// Apply theme immediately when module loads to prevent flash
+const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+let initialTheme: 'light' | 'dark' = 'light';
+
+if (savedTheme) {
+  initialTheme = savedTheme;
+} else if (systemPrefersDark) {
+  initialTheme = 'dark';
+}
+
+if (initialTheme === 'dark') {
+  document.documentElement.classList.add('dark');
+} else {
+  document.documentElement.classList.remove('dark');
+}
+
 interface ThemeContextType {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -8,21 +25,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    // Check for saved theme preference
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (savedTheme) {
-      setTheme(savedTheme);
-    } else if (systemPrefersDark) {
-      setTheme('dark');
-    } else {
-      setTheme('light');
-    }
-  }, []);
+  const [theme, setTheme] = useState<'light' | 'dark'>(initialTheme);
 
   useEffect(() => {
     // Apply theme to document
