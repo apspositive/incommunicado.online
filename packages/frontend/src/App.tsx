@@ -25,6 +25,7 @@ function App() {
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [isCallActive, setIsCallActive] = useState<boolean>(false);
   const [unreadMessages, setUnreadMessages] = useState<Record<string, number>>({});
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const socketRef = useRef<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -97,10 +98,19 @@ function App() {
         console.log('New invitee joined:', data.inviteeId);
       });
     } else {
-      // Send our client ID to the server (regular client)
-      socketRef.current.emit('register-client', clientId);
+      // Send our client ID to the server (regular client) with secret key
+      const urlParams = new URLSearchParams(window.location.search);
+      const startId = urlParams.get('start_id');
+      socketRef.current.emit('register-client', clientId, startId);
     }
     
+    // Handle authentication errors
+    socketRef.current.on('auth-error', (data: { message: string }) => {
+      console.error('Authentication error:', data.message);
+      setAuthError(data.message);
+    });
+    
+    // Handle client list updates
     socketRef.current.on('clients-list', (clientsList: Client[]) => {
       // Filter clients based on invite link status
       const masterId = localStorage.getItem('masterId') || 
@@ -288,128 +298,133 @@ function App() {
       </header>
       
       <main>
-        <div className="clients-section">
-          <h2>Connected Clients</h2>
-          {clients.length === 0 ? (
-            <p>No other clients connected</p>
-          ) : (
-            <ul>
-              {clients.map(client => (
-                <li 
-                  key={client.id}
-                  className={selectedClient === client.id ? 'selected' : ''}
-                  onClick={() => {
-                    // Reset unread count when selecting a client
-                    if (unreadMessages[client.id]) {
-                      setUnreadMessages(prev => {
-                        const newUnread = { ...prev };
-                        delete newUnread[client.id];
-                        return newUnread;
-                      });
-                      
-                      // Notify the sender that their messages have been read
-                      if (socketRef.current) {
-                        socketRef.current.emit('mark-messages-as-read', {
-                          senderId: client.id,
-                          targetId: clientId
-                        });
-                      }
-                    }
-                    setSelectedClient(client.id);
-                  }}
-                >
-                  {client.id}
-                  {unreadMessages[client.id] > 0 && (
-                    <span className="unread-count">{unreadMessages[client.id]}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        
-        {isCallActive ? (
-          // Show call section when call is active
-          <div className="call-section">
-            <h2>Voice/Video Call</h2>
-            <div className="video-container">
-              <div className="video-wrapper">
-                <video ref={localVideoRef} autoPlay muted playsInline />
-                <div className="video-label">You</div>
-              </div>
-              <div className="video-wrapper">
-                <video ref={remoteVideoRef} autoPlay playsInline />
-                <div className="video-label">Remote</div>
-              </div>
-            </div>
-            <div className="call-controls">
-              <button 
-                onClick={() => {
-                  setIsCallActive(false);
-                  if (peerConnectionRef.current) {
-                    peerConnectionRef.current.close();
-                    peerConnectionRef.current = null;
-                  }
-                  if (localVideoRef.current && localVideoRef.current.srcObject) {
-                    (localVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-                    localVideoRef.current.srcObject = null;
-                  }
-                  if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-                    (remoteVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
-                    remoteVideoRef.current.srcObject = null;
-                  }
-                }}
-              >
-                End Call
-              </button>
-            </div>
+        {authError ? (
+          <div className="auth-error">
+            <h2>401 Unauthorized</h2>
+            <p>{authError}</p>
+            <p>Please check that you have the correct secret key in the session.</p>
           </div>
         ) : (
-          // Show messaging section when no call is active
           <>
-            <div className="messaging-section">
-              <h2>Messages</h2>
-              <div className="messages-container">
-                {messages
-                  .filter(msg => 
-                    (msg.senderId === clientId && msg.targetId === selectedClient) ||
-                    (msg.senderId === selectedClient && msg.targetId === clientId)
-                  )
-                  .map(message => (
-                    <div 
-                      key={message.id} 
-                      className={`message ${message.senderId === clientId ? 'sent' : 'received'}`}
+            <div className="clients-section">
+              <h2>Connected Clients</h2>
+              {clients.length === 0 ? (
+                <p>No other clients connected</p>
+              ) : (
+                <ul>
+                  {clients.map(client => (
+                    <li 
+                      key={client.id}
+                      className={selectedClient === client.id ? 'selected' : ''}
+                      onClick={() => {
+                        // Reset unread count when selecting a client
+                        if (unreadMessages[client.id]) {
+                          setUnreadMessages(prev => {
+                            const newUnread = { ...prev };
+                            delete newUnread[client.id];
+                            return newUnread;
+                          });
+                          
+                          // Notify the sender that their messages have been read
+                          if (socketRef.current) {
+                            socketRef.current.emit('mark-messages-as-read', {
+                              senderId: client.id,
+                              targetId: clientId
+                            });
+                          }
+                        }
+                        setSelectedClient(client.id);
+                      }}
                     >
-                      <div className="message-content">{message.content}</div>
-                      <div className="message-time">
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-              
-              <div className="message-input">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Type a message..."
-                  disabled={!selectedClient}
-                />
-                <button onClick={sendMessage} disabled={!selectedClient}>Send</button>
-              </div>
+                      {client.id}
+                      {unreadMessages[client.id] > 0 && (
+                        <span className="unread-count">{unreadMessages[client.id]}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             
-            <div className="call-section">  
-              <h2>Voice/Video Call</h2>
-              <div className="call-controls">
-                <button onClick={startCall} disabled={!selectedClient} className='start-call-btn'>
-                  Start Call
-                </button>
+            {isCallActive ? (
+              // Show call section when call is active
+              <div className="call-section">
+                <h2>Voice/Video Call</h2>
+                <div className="video-container">
+                  <div className="video-wrapper">
+                    <video className="remote-video" ref={remoteVideoRef} autoPlay playsInline />
+                    <video className="local-video" ref={localVideoRef} autoPlay muted playsInline />
+                  </div>
+                </div>
+                <div className="call-controls">
+                  <button 
+                    className="end-call-btn"
+                    onClick={() => {
+                      setIsCallActive(false);
+                      if (peerConnectionRef.current) {
+                        peerConnectionRef.current.close();
+                        peerConnectionRef.current = null;
+                      }
+                      if (localVideoRef.current && localVideoRef.current.srcObject) {
+                        (localVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+                        localVideoRef.current.srcObject = null;
+                      }
+                      if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
+                        (remoteVideoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+                        remoteVideoRef.current.srcObject = null;
+                      }
+                    }}
+                  >
+                    End Call
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              // Show messaging section when no call is active
+              <>
+                <div className="messaging-section">
+                  <div className="messages-header">
+                    <h2>Messages</h2>
+                    <div className="call-controls">
+                      <button onClick={startCall} disabled={!selectedClient} className='start-call-btn'>
+                        Start Call
+                      </button>
+                    </div>
+                  </div>
+                  <div className="messages-container">
+                    {messages
+                      .filter(msg => 
+                        (msg.senderId === clientId && msg.targetId === selectedClient) ||
+                        (msg.senderId === selectedClient && msg.targetId === clientId)
+                      )
+                      .map(message => (
+                        <div 
+                          key={message.id} 
+                          className={`message ${message.senderId === clientId ? 'sent' : 'received'}`}
+                        >
+                          <div className="message-content">{message.content}</div>
+                          <div className="message-time">
+                            {new Date(message.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                  
+                  <div className="message-input">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                      placeholder="Type a message..."
+                      disabled={!selectedClient}
+                    />
+                    <button onClick={sendMessage} disabled={!selectedClient}>Send</button>
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </main>

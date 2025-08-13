@@ -1,6 +1,8 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 const server = http.createServer(app);
@@ -10,6 +12,19 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Read secret key from file
+let SECRET_KEY = '';
+try {
+  // Use import.meta.url to get the directory in ES modules
+  const currentDir = path.dirname(new URL(import.meta.url).pathname);
+  const secretKeyPath = path.join(currentDir, '../secret.key');
+  SECRET_KEY = fs.readFileSync(secretKeyPath, 'utf8').trim();
+  console.log('Secret key loaded successfully');
+} catch (error) {
+  console.error('Failed to read secret key file:', error);
+  process.exit(1);
+}
 
 // Store connected clients
 const clients = new Map<string, { id: string; socketId: string }>();
@@ -23,7 +38,20 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
   
   // Handle client registration with their provided ID
-  socket.on('register-client', (clientId: string) => {
+  socket.on('register-client', (clientId: string, secretKey?: string) => {
+    // Check if this is a master client (not joining via invite link)
+    const isMasterClient = !Array.from(inviteLinks.entries()).some(([_, invitees]) => 
+      invitees.includes(clientId)
+    );
+    
+    // If this is a master client, require secret key authentication
+    if (isMasterClient && secretKey !== SECRET_KEY) {
+      // Send 401 error to client
+      socket.emit('auth-error', { message: 'Unauthorized: Invalid or missing secret key' });
+      socket.disconnect();
+      return;
+    }
+    
     // Store client info
     clients.set(clientId, { id: clientId, socketId: socket.id });
     
