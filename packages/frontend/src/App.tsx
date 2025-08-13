@@ -38,11 +38,8 @@ function App() {
     const invitationId = urlParams.get('join');
     
     if (invitationId) {
-      // If there's an invitation, show a notification to the user
-      setTimeout(() => {
-        alert(`You've been invited to join a conversation with ID: ${invitationId}`);
-        // You could automatically select this client or show a special UI
-      }, 1000);
+      // Store master ID for invitee
+      localStorage.setItem('masterId', invitationId);
     }
     
     // Generate a unique ID using three random English words
@@ -54,13 +51,70 @@ function App() {
   useEffect(() => {
     if (!clientId) return;
     
-    socketRef.current = io('http://localhost:3000');
+    socketRef.current = io('http://localhost:3001');
     
-    // Send our client ID to the server
-    socketRef.current.emit('register-client', clientId);
+    // Check if this is an invitee joining via invite link
+    const masterId = localStorage.getItem('masterId');
+    if (masterId) {
+      // Emit invite-link-join event
+      socketRef.current.emit('invite-link-join', { masterId, inviteeId: clientId });
+      
+      // Handle invite link success
+      socketRef.current.on('invite-link-success', (data: { masterId: string }) => {
+        console.log('Successfully joined via invite link');
+        // Automatically select the master client
+        setSelectedClient(data.masterId);
+        // Clear the invite link from localStorage
+        localStorage.removeItem('masterId');
+      });
+      
+      // Handle new invitee notifications (for masters)
+      socketRef.current.on('new-invitee', (data: { inviteeId: string }) => {
+        console.log('New invitee joined:', data.inviteeId);
+        // Automatically select the new invitee if it's not already selected
+        if (clients.some(client => client.id === data.inviteeId) && !selectedClient) {
+          setSelectedClient(data.inviteeId);
+        }
+      });
+      
+      // Handle master connection notifications (for invitees)
+      socketRef.current.on('master-connected', (data: { masterId: string }) => {
+        console.log('Master connected:', data.masterId);
+        // Automatically select the master client
+        setSelectedClient(data.masterId);
+      });
+      
+      // Handle invite link error
+      socketRef.current.on('invite-link-error', (data: { message: string }) => {
+        console.error('Invite link error:', data.message);
+        alert(`Invite link error: ${data.message}`);
+        // Clear the invite link from localStorage
+        localStorage.removeItem('masterId');
+      });
+      
+      // Handle new invitee notifications (for masters)
+      socketRef.current.on('new-invitee', (data: { inviteeId: string }) => {
+        console.log('New invitee joined:', data.inviteeId);
+      });
+    } else {
+      // Send our client ID to the server (regular client)
+      socketRef.current.emit('register-client', clientId);
+    }
     
     socketRef.current.on('clients-list', (clientsList: Client[]) => {
-      setClients(clientsList.filter(client => client.id !== clientId));
+      // Filter clients based on invite link status
+      const masterId = localStorage.getItem('masterId') || 
+        (Array.from(clientsList).find(client => client.id !== clientId) ? 
+         Array.from(clientsList).find(client => client.id !== clientId)!.id : null);
+      
+      if (masterId) {
+        // If this is an invitee, only show the master client
+        const masterClient = clientsList.find(client => client.id === masterId);
+        setClients(masterClient ? [masterClient] : []);
+      } else {
+        // Regular clients see all other clients
+        setClients(clientsList.filter(client => client.id !== clientId));
+      }
     });
     
     socketRef.current.on('message', (message: Message) => {
