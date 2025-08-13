@@ -1,0 +1,25 @@
+# Apache configuration for Incommunicado
+# Simpler version for shared hosting compatibility
+
+# Enable rewrite engine if available
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # Fallback for HTML5 history API
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [QSA,L]
+</IfModule>
+
+# Basic security headers
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options nosniff
+  Header always set X-Frame-Options DENY
+</IfModule>
+
+# Ensure proper MIME types
+<IfModule mod_mime.c>
+  AddType text/css .css
+  AddType application/javascript .js
+  AddType image/svg+xml .svg
+</IfModule>

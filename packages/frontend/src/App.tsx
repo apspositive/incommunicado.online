@@ -34,6 +34,57 @@ function App() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   
+  // Fallback function for copying text to clipboard
+  const fallbackCopyTextToClipboard = (text: string) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      
+      // Avoid scrolling to bottom
+      textArea.style.top = '0';
+      textArea.style.left = '0';
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        alert('Invite link copied to clipboard!');
+      } else {
+        alert('Failed to copy link. Please copy it manually: ' + text);
+      }
+    } catch (err) {
+      console.error('Fallback copy failed: ', err);
+      alert('Failed to copy link. Please copy it manually: ' + text);
+    }
+  };
+  
+  // Function to copy client ID to clipboard
+  const copyClientIdToClipboard = () => {
+    const link = `${window.location.origin}?join=${clientId}`;
+    
+    // Try to use Clipboard API first
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(link)
+        .then(() => {
+          alert('Invite link copied to clipboard!');
+        })
+        .catch(err => {
+          console.error('Failed to copy link: ', err);
+          // Fallback to manual copy
+          fallbackCopyTextToClipboard(link);
+        });
+    } else {
+      // Fallback for older browsers or insecure contexts
+      fallbackCopyTextToClipboard(link);
+    }
+  };
+  
   // Generate client ID on app start and handle invitation links
   useEffect(() => {
     // Check if there's an invitation parameter in the URL
@@ -54,7 +105,50 @@ function App() {
   useEffect(() => {
     if (!clientId) return;
     
-    socketRef.current = io('http://localhost:3001');
+    console.log('Initializing socket connection with client ID:', clientId);
+    
+    // Determine backend URL based on environment
+    let socketUrl: string;
+    
+    // Get environment variable safely
+    const backendUrl = (import.meta as any).env?.VITE_BACKEND_URL;
+    
+    if (backendUrl) {
+      // Use environment variable if set
+      socketUrl = backendUrl;
+    } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Development environment - connect to localhost:3001
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      socketUrl = `${protocol}//localhost:3001`;
+    } else {
+      // Production environment - connect to same domain/port with /socket.io path
+      // Apache will proxy /socket.io requests to the backend server
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host; // includes port if any
+      socketUrl = `${protocol}//${host}/socket.io`;
+    }
+    
+    console.log('Socket URL:', socketUrl);
+    
+    socketRef.current = io(socketUrl);
+    
+    // Check if socket connection is established
+    socketRef.current.on('connect', () => {
+      console.log('Socket connected with ID:', socketRef.current.id);
+    });
+    
+    // Handle connection errors
+    socketRef.current.on('connect_error', (error: any) => {
+      console.error('Socket connection error:', error);
+      console.error('Failed to connect to:', socketUrl);
+      // Set an error state to show to the user
+      setAuthError(`Failed to connect to server: ${error.message}`);
+    });
+    
+    // Handle disconnections
+    socketRef.current.on('disconnect', (reason: any) => {
+      console.log('Socket disconnected:', reason);
+    });
     
     // Check if this is an invitee joining via invite link
     const masterId = localStorage.getItem('masterId');
@@ -102,31 +196,31 @@ function App() {
     } else {
       // Send our client ID to the server (regular client) with secret key
       const urlParams = new URLSearchParams(window.location.search);
-      const startId = urlParams.get('start_id');
-      socketRef.current.emit('register-client', clientId, startId);
+      const urlSecretKey = urlParams.get('start_id');
+      const storedSecretKey = localStorage.getItem('secretKey');
+      const secretKey = urlSecretKey || storedSecretKey;
+      
+      console.log('Registering client:', clientId);
+      console.log('Secret key:', secretKey);
+      
+      socketRef.current.emit('register-client', clientId, secretKey);
+      
+      // Also store the secret key in localStorage for future use
+      if (secretKey) {
+        localStorage.setItem('secretKey', secretKey);
+      }
     }
     
     // Handle authentication errors
     socketRef.current.on('auth-error', (data: { message: string }) => {
       console.error('Authentication error:', data.message);
-      setAuthError(data.message);
+      setAuthError(`Authentication failed: ${data.message}. Please contact the administrator or try accessing via an invite link.`);
     });
     
     // Handle client list updates
     socketRef.current.on('clients-list', (clientsList: Client[]) => {
-      // Filter clients based on invite link status
-      const masterId = localStorage.getItem('masterId') || 
-        (Array.from(clientsList).find(client => client.id !== clientId) ? 
-         Array.from(clientsList).find(client => client.id !== clientId)!.id : null);
-      
-      if (masterId) {
-        // If this is an invitee, only show the master client
-        const masterClient = clientsList.find(client => client.id === masterId);
-        setClients(masterClient ? [masterClient] : []);
-      } else {
-        // Regular clients see all other clients
-        setClients(clientsList.filter(client => client.id !== clientId));
-      }
+      // Update clients list - filter out self
+      setClients(clientsList.filter(client => client.id !== clientId));
     });
     
     socketRef.current.on('message', (message: Message) => {
@@ -200,6 +294,14 @@ function App() {
   
   // Initialize WebRTC peer connection
   const initializePeerConnection = () => {
+    // Check if WebRTC is supported
+    if (!navigator.mediaDevices) {
+      const errorMsg = 'WebRTC is not supported in your browser or context. Please ensure you are using a modern browser over HTTPS.';
+      console.error(errorMsg);
+      alert(errorMsg);
+      return;
+    }
+    
     const configuration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -237,6 +339,8 @@ function App() {
       })
       .catch(error => {
         console.error('Error accessing media devices:', error);
+        const errorMsg = 'Failed to access camera/microphone. Please ensure you have granted permissions and are using a secure connection (HTTPS).';
+        alert(errorMsg);
       });
   };
   
@@ -262,11 +366,19 @@ function App() {
     if (!selectedClient) return;
     
     initializePeerConnection();
+    
+    // Check if peer connection was successfully created
+    if (!peerConnectionRef.current) {
+      console.error('Failed to initialize peer connection');
+      setIsCallActive(false);
+      return;
+    }
+    
     setIsCallActive(true);
     
     try {
-      const offer = await peerConnectionRef.current!.createOffer();
-      await peerConnectionRef.current!.setLocalDescription(offer);
+      const offer = await peerConnectionRef.current.createOffer();
+      await peerConnectionRef.current.setLocalDescription(offer);
       
       socketRef.current.emit('offer', {
         targetId: selectedClient,
@@ -274,6 +386,9 @@ function App() {
       });
     } catch (error) {
       console.error('Error creating offer:', error);
+      const errorMsg = 'Failed to start call. Please ensure you are using a secure connection (HTTPS) and have granted camera/microphone permissions.';
+      alert(errorMsg);
+      setIsCallActive(false);
     }
   };
   
@@ -289,8 +404,22 @@ function App() {
             className="client-id"
             onClick={() => {
               const link = `${window.location.origin}?join=${clientId}`;
-              navigator.clipboard.writeText(link);
-              alert('Invite link copied to clipboard!');
+              
+              // Try to use Clipboard API first
+              if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(link)
+                  .then(() => {
+                    alert('Invite link copied to clipboard!');
+                  })
+                  .catch(err => {
+                    console.error('Failed to copy link: ', err);
+                    // Fallback to manual copy
+                    fallbackCopyTextToClipboard(link);
+                  });
+              } else {
+                // Fallback for older browsers or insecure contexts
+                fallbackCopyTextToClipboard(link);
+              }
             }}
             style={{ cursor: 'pointer' }}
           >
@@ -302,49 +431,71 @@ function App() {
       <main>
         {authError ? (
           <div className="auth-error">
-            <h2>401 Unauthorized</h2>
+            <h2>Authentication Error</h2>
             <p>{authError}</p>
-            <p>Please check that you have the correct secret key in the session.</p>
+            <div className="auth-error-help">
+              <h3>How to resolve this issue:</h3>
+              <ul>
+                <li>If you're trying to create a new session, you need to access the app with a special URL that includes the secret key</li>
+                <li>If you're joining an existing session, you should use an invite link provided by the session creator</li>
+                <li>Contact the site administrator if you believe you should have access</li>
+              </ul>
+              <button onClick={() => {
+                // Clear auth error and try to reconnect
+                setAuthError(null);
+                if (socketRef.current) {
+                  socketRef.current.disconnect();
+                  // Reinitialize connection
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 100);
+                }
+              }}>Try Again</button>
+            </div>
           </div>
         ) : (
           <>
+            <div className="client-id-section">
+              <h2>Your Client ID: <span className="client-id" onClick={copyClientIdToClipboard}>{clientId}</span></h2>
+              <p className="instructions">Share this ID with others to connect, or use an invite link if someone shared one with you.</p>
+            </div>
+            
+            <div className="invite-section">
+              <h2>Invite Others</h2>
+              <p>Share this link to invite others to connect with you:</p>
+              <div className="invite-link-container">
+                <code className="invite-link">{window.location.href}?join={clientId}</code>
+              </div>
+            </div>
+            
             <div className="clients-section">
               <h2>Connected Clients</h2>
               {clients.length === 0 ? (
-                <p>No other clients connected</p>
+                <p>No other clients connected. Share your ID or invite link to connect with others.</p>
               ) : (
-                <ul>
+                <div className="client-list">
                   {clients.map(client => (
-                    <li 
-                      key={client.id}
-                      className={selectedClient === client.id ? 'selected' : ''}
+                    <div 
+                      key={client.id} 
+                      className={`client-item ${selectedClient === client.id ? 'selected' : ''}`} 
                       onClick={() => {
-                        // Reset unread count when selecting a client
-                        if (unreadMessages[client.id]) {
-                          setUnreadMessages(prev => {
-                            const newUnread = { ...prev };
-                            delete newUnread[client.id];
-                            return newUnread;
-                          });
-                          
-                          // Notify the sender that their messages have been read
-                          if (socketRef.current) {
-                            socketRef.current.emit('mark-messages-as-read', {
-                              senderId: client.id,
-                              targetId: clientId
-                            });
-                          }
-                        }
                         setSelectedClient(client.id);
+                        // Mark messages as read when client is selected
+                        setUnreadMessages(prev => ({
+                          ...prev,
+                          [client.id]: 0
+                        }));
+                        // Notify sender that their messages have been read
+                        socketRef.current.emit('mark-messages-as-read', { senderId: clientId, targetId: client.id });
                       }}
                     >
                       {client.id}
                       {unreadMessages[client.id] > 0 && (
                         <span className="unread-count">{unreadMessages[client.id]}</span>
                       )}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
             

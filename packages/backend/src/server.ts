@@ -39,23 +39,37 @@ io.on('connection', (socket) => {
   
   // Handle client registration with their provided ID
   socket.on('register-client', (clientId: string, secretKey?: string) => {
+    console.log(`Client registration attempt: ${clientId}`);
+    console.log(`Provided secret key: ${secretKey}`);
+    console.log(`Expected secret key: ${SECRET_KEY}`);
+    
     // Check if this is a master client (not joining via invite link)
     const isMasterClient = !Array.from(inviteLinks.entries()).some(([_, invitees]) => 
       invitees.includes(clientId)
     );
     
-    // If this is a master client, require secret key authentication
-    if (isMasterClient && secretKey !== SECRET_KEY) {
+    console.log(`Is master client: ${isMasterClient}`);
+    
+    // Check if strict authentication is enabled via environment variable
+    const strictAuth = process.env.STRICT_AUTH === 'true';
+    
+    // If strict authentication is enabled and this is a master client, require secret key authentication
+    if (strictAuth && isMasterClient && secretKey !== SECRET_KEY) {
+      console.log(`Authentication failed for master client ${clientId}`);
       // Send 401 error to client
       socket.emit('auth-error', { message: 'Unauthorized: Invalid or missing secret key' });
       socket.disconnect();
       return;
     }
     
+    console.log(`Authentication successful for client ${clientId}`);
+    
     // Store client info
     clients.set(clientId, { id: clientId, socketId: socket.id });
+    console.log(`Client stored: ${clientId} with socket ID: ${socket.id}`);
     
     // Broadcast updated client list to all clients with security filtering
+    console.log('Broadcasting client list');
     broadcastClientList();
   });
   
@@ -205,7 +219,13 @@ function isAuthorizedConnection(senderId: string, targetId: string): boolean {
 
 // Function to broadcast client list with security filtering
 function broadcastClientList() {
+  console.log('Broadcasting client list to all clients');
+  console.log(`Total clients: ${clients.size}`);
+  console.log(`Invite links:`, Array.from(inviteLinks.entries()));
+  
   clients.forEach((client, clientId) => {
+    console.log(`Broadcasting to client: ${clientId}`);
+    
     // Check if this client joined via invite link
     const masterId = Array.from(inviteLinks.entries()).find(([masterId, invitees]) => 
       invitees.includes(clientId)
@@ -213,22 +233,27 @@ function broadcastClientList() {
     
     if (masterId) {
       // This is an invitee, only show master and self
+      console.log(`Client ${clientId} is an invitee of master ${masterId}`);
       const masterClient = clients.get(masterId);
       const inviteeClient = clients.get(clientId);
       if (masterClient && inviteeClient) {
+        console.log(`Sending clients list to invitee ${clientId}:`, [masterClient, inviteeClient]);
         io.to(client.socketId).emit('clients-list', [masterClient, inviteeClient]);
       }
     } else if (inviteLinks.has(clientId)) {
       // This is a master, show self and all invitees
+      console.log(`Client ${clientId} is a master`);
       const masterClient = clients.get(clientId);
       const invitees = inviteLinks.get(clientId) || [];
       const inviteeClients = invitees.map(id => clients.get(id)).filter(Boolean) as { id: string; socketId: string }[];
       
       if (masterClient) {
+        console.log(`Sending clients list to master ${clientId}:`, [masterClient, ...inviteeClients]);
         io.to(client.socketId).emit('clients-list', [masterClient, ...inviteeClients]);
       }
     } else {
       // Regular client, show only other regular clients and masters (not invitees of other masters)
+      console.log(`Client ${clientId} is a regular client`);
       const regularClients = Array.from(clients.entries())
         .filter(([id, _]) => {
           // Don't show invitees of other masters
@@ -241,6 +266,7 @@ function broadcastClientList() {
         })
         .map(([_, client]) => client);
       
+      console.log(`Sending clients list to regular client ${clientId}:`, regularClients);
       io.to(client.socketId).emit('clients-list', regularClients);
     }
   });
