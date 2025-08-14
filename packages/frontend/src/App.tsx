@@ -54,7 +54,19 @@ function App() {
   useEffect(() => {
     if (!clientId) return;
     
-    socketRef.current = io('http://localhost:3001');
+    // Determine the correct socket URL based on the current environment
+    let socketUrl: string;
+    
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Development environment
+      socketUrl = 'http://localhost:3001';
+    } else {
+      // Production environment - use the same host as the frontend
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      socketUrl = `${protocol}//${window.location.hostname}:3001`;
+    }
+    
+    socketRef.current = io(socketUrl);
     
     // Check if this is an invitee joining via invite link
     const masterId = localStorage.getItem('masterId');
