@@ -67,6 +67,7 @@ function App() {
     }
     
     socketRef.current = io(socketUrl);
+    console.log (socketUrl);
     
     // Check if this is an invitee joining via invite link
     const masterId = localStorage.getItem('masterId');

@@ -5,11 +5,31 @@ import fs from 'fs';
 import path from 'path';
 
 const app = express();
+// Trust proxy to correctly handle forwarded headers
+app.set('trust proxy', true);
+
+// Add middleware to handle proxy headers
+app.use((req, res, next) => {
+  // Handle X-Forwarded-* headers
+  if (req.headers['x-forwarded-proto'] === 'https') {
+    (req as any).secure = true;
+  }
+  next();
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  // Configure Socket.IO for proxy environments
+  allowEIO3: true,
+  transports: ['websocket', 'polling'],
+  // Additional production settings
+  allowRequest: (req, callback) => {
+    callback(null, true);
   }
 });
 
