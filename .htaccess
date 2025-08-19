@@ -1,0 +1,11 @@
+RewriteEngine on
+
+# Handle WebSocket upgrade requests for Socket.IO
+RewriteCond %{HTTP:Upgrade} websocket [NC]
+RewriteCond %{HTTP:Connection} upgrade [NC]
+RewriteRule ^socket\.io/(.*)$ wss://www.incommunicado.online:443/socket.io/$1 [P,L]
+
+# Handle regular HTTP requests to the backend API
+RewriteRule ^api/(.*)$ https://www.incommunicado.online:443/$1 [P,L]
+
+DirectoryIndex disabled

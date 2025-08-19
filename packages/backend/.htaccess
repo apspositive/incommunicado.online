@@ -1,0 +1,18 @@
+<IfModule mod_proxy.c>
+    ProxyRequests Off
+    SSLProxyEngine On
+
+    # Ensure WebSocket protocol is forwarded correctly
+   # RewriteEngine on
+   # RewriteCond %{HTTP:UPGRADE} ^Websocket$ [NC]
+   # RewriteCond %{HTTP:CONNECTION} Upgrade$ [NC]
+   # RewriteRule /app/(.*) wss://www.incommunicado.online:443/socket.io/$1 [P]
+
+# Frontend
+rewriteRule ^(.*)(.html|.htm)$ index.php [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-l
+RewriteRule ^(.*)/?$ index.html [L]
+
+</IfModule>

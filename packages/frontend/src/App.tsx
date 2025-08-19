@@ -57,14 +57,9 @@ function App() {
     // Determine the correct socket URL based on the current environment
     let socketUrl: string;
     
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // Development environment
-      socketUrl = 'http://localhost:3001';
-    } else {
-      // Production environment - use the same host as the frontend
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      socketUrl = `${protocol}//${window.location.hostname}:3001`;
-    }
+    // Use port 443 in all environments
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    socketUrl = `${protocol}//${window.location.hostname}:443`;
     
     socketRef.current = io(socketUrl);
     console.log (socketUrl);

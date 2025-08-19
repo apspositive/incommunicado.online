@@ -9,7 +9,7 @@ const app = express();
 app.set('trust proxy', true);
 
 // Add middleware to handle proxy headers
-app.use((req, res, next) => {
+app.use('/api/v1', (req, res, next) => {
   // Handle X-Forwarded-* headers
   if (req.headers['x-forwarded-proto'] === 'https') {
     (req as any).secure = true;
@@ -52,7 +52,7 @@ const clients = new Map<string, { id: string; socketId: string }>();
 // Store invite link mappings (masterId -> inviteeId[])
 const inviteLinks = new Map<string, string[]>();
 
-app.use(express.static('public'));
+app.use('/api/v1', express.static('public'));
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -266,7 +266,7 @@ function broadcastClientList() {
   });
 }
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 443 : 3001);
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
